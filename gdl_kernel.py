@@ -1,7 +1,8 @@
 from ipykernel.kernelbase import Kernel
-from IPython.utils.path import locate_profile
 from IPython.core.displaypub import publish_display_data
 from pexpect import replwrap,EOF,spawn
+from IPython.paths import get_ipython_dir
+
 
 import signal
 from subprocess import check_output
@@ -16,6 +17,11 @@ from distutils.spawn import find_executable
 __version__ = '0.5'
 
 version_pat = re.compile(r'Version (\d+(\.\d+)+)')
+
+
+   
+def locate_profile(profile='default'):
+    return os.path.join(get_ipython_dir(), 'profile_' + profile)
 
 class GDLKernel(Kernel):
     implementation = 'gdl_kernel'
@@ -66,7 +72,7 @@ class GDLKernel(Kernel):
         sig = signal.signal(signal.SIGINT, signal.SIG_DFL)
         try:
             self._executable = find_executable("gdl")
-            self._child  = spawn(self._executable+' --use-wx ',timeout = 300, encoding='utf-8')
+            self._child  = spawn(self._executable+'',timeout = 300, encoding='utf-8')
             self.gdlwrapper = replwrap.REPLWrapper(self._child,u"GDL> ",None)
         finally:
             signal.signal(signal.SIGINT, sig)
@@ -178,7 +184,7 @@ class GDLKernel(Kernel):
             return {'history': []}
 
         if not os.path.exists(self.hist_file):
-            with open(self.hist_file, 'wb') as f:
+            with open(self.hist_file, 'w') as f:
                 f.write('')
 
         with open(self.hist_file, 'rb') as f:
@@ -191,17 +197,15 @@ class GDLKernel(Kernel):
         history = [(None, None, h) for h in history]
 
         return {'history': history}
-
     def do_shutdown(self, restart):
         self.log.debug("**Shutting down")
-
         self.gdlwrapper.child.kill(signal.SIGKILL)
-
         if self.hist_file:
             with open(self.hist_file,'wb') as f:
-                data = '\n'.join(self.hist_cache[-self.max_hist_cache:])
+                # Filter and convert to strings
+                hist_items = [str(item) for item in self.hist_cache[-self.max_hist_cache:] if item is not None]
+                data = '\n'.join(hist_items)
                 f.write(data.encode('utf-8'))
-
         return {'status':'ok', 'restart':restart}
 
 if __name__ == '__main__':
